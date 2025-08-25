@@ -1,0 +1,56 @@
+version: '3.8'
+
+services:
+  hibe-ai:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - PORT=3000
+      - DB_PATH=./database/hibe_ai.db
+      - DB_LOGGING=true
+      - WEBHOOK_TOKEN=dev-webhook-token-12345678901234567890123456789012
+      - JWT_SECRET=dev-jwt-secret-key-12345678901234567890123456789012
+      - BATCH_MAX_CONCURRENT_WORKERS=5
+      - BATCH_RETRY_ATTEMPTS=3
+      - BATCH_RETRY_DELAY_MS=1000
+      - CHECKOUT_BASE_URL=https://sandbox.hibe.local/checkout
+      - LOG_LEVEL=debug
+      - ENABLE_METRICS=true
+      - ENABLE_BATCH_PROCESSING=true
+      - ENABLE_WEBHOOKS=true
+      - ENABLE_IDEMPOTENCY=true
+    volumes:
+      - ./database:/app/database
+      - ./logs:/app/logs
+    command: npm run dev
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    depends_on: []
+
+  # Optional: Add Prometheus for metrics collection
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    profiles:
+      - monitoring
+
+volumes:
+  prometheus_data:

@@ -1,0 +1,574 @@
+openapi: 3.0.3
+info:
+  title: HIBE AI Payment API
+  description: API para el servicio de solicitudes de pago de HIBE AI
+  version: 1.0.0
+  contact:
+    name: Jonathan Pilatti
+    email: jonypilatti@gmail.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:3000
+    description: Servidor de desarrollo
+  - url: https://api.hibe.local
+    description: Servidor de producción
+
+paths:
+  /health:
+    get:
+      summary: Health check
+      description: Verifica el estado del servicio
+      tags:
+        - Health
+      responses:
+        '200':
+          description: Servicio funcionando correctamente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "OK"
+                  environment:
+                    type: string
+                    example: "development"
+                  database:
+                    type: object
+                    properties:
+                      status:
+                        type: string
+                        example: "healthy"
+                  timestamp:
+                    type: string
+                    format: date-time
+                  uptime:
+                    type: number
+
+  /metrics:
+    get:
+      summary: Prometheus metrics
+      description: Endpoint para métricas de Prometheus
+      tags:
+        - Monitoring
+      responses:
+        '200':
+          description: Métricas en formato Prometheus
+          content:
+            text/plain:
+              schema:
+                type: string
+
+  /api/v1/payments:
+    post:
+      summary: Crear solicitud de pago
+      description: Crea una nueva solicitud de pago con validación e idempotencia
+      tags:
+        - Payments
+      security:
+        - idempotencyKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePaymentRequest'
+      responses:
+        '201':
+          description: Pago creado exitosamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreatePaymentResponse'
+        '400':
+          description: Error de validación
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '409':
+          description: Conflicto de idempotencia
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IdempotencyConflictError'
+        '500':
+          description: Error interno del servidor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InternalServerError'
+
+    get:
+      summary: Listar pagos
+      description: Lista los pagos existentes con paginación por cursor
+      tags:
+        - Payments
+      parameters:
+        - name: status
+          in: query
+          description: Filtro por estado del pago
+          schema:
+            type: string
+            enum: [pending, paid, reversed]
+        - name: limit
+          in: query
+          description: Número máximo de resultados (1-100)
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: cursor
+          in: query
+          description: Cursor para paginación
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Lista de pagos obtenida exitosamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListPaymentsResponse'
+        '400':
+          description: Error en parámetros de consulta
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '500':
+          description: Error interno del servidor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InternalServerError'
+
+  /api/v1/payments/batch:
+    post:
+      summary: Crear pagos por lotes
+      description: Crea múltiples pagos en lote con workers concurrentes y reintentos
+      tags:
+        - Batch Payments
+      security:
+        - idempotencyKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BatchPaymentRequest'
+      responses:
+        '200':
+          description: Lote procesado exitosamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BatchPaymentResponse'
+        '400':
+          description: Error de validación
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '409':
+          description: Conflicto de idempotencia
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IdempotencyConflictError'
+        '429':
+          description: Rate limit excedido
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RateLimitError'
+        '500':
+          description: Error interno del servidor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InternalServerError'
+
+  /api/v1/webhooks/simulate:
+    post:
+      summary: Simular actualización de estado via webhook
+      description: Simula la actualización del estado de un pago via webhook
+      tags:
+        - Webhooks
+      security:
+        - webhookToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WebhookRequest'
+      responses:
+        '200':
+          description: Estado actualizado exitosamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookResponse'
+        '401':
+          description: Token de webhook inválido
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '404':
+          description: Pago no encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFoundError'
+        '422':
+          description: Transición de estado inválida
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnprocessableEntityError'
+        '500':
+          description: Error interno del servidor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InternalServerError'
+
+components:
+  securitySchemes:
+    idempotencyKey:
+      type: apiKey
+      name: Idempotency-Key
+      in: header
+      description: Clave de idempotencia única (UUID)
+    webhookToken:
+      type: apiKey
+      name: X-Webhook-Token
+      in: header
+      description: Token secreto para autenticación de webhooks
+
+  schemas:
+    CreatePaymentRequest:
+      type: object
+      required:
+        - description
+        - due_date
+        - amount_cents
+        - currency
+        - payer
+      properties:
+        description:
+          type: string
+          minLength: 1
+          maxLength: 200
+          description: Descripción del pago
+          example: "Pago por servicios"
+        due_date:
+          type: string
+          format: date
+          description: Fecha de vencimiento (YYYY-MM-DD)
+          example: "2026-01-15"
+        amount_cents:
+          type: integer
+          minimum: 1
+          description: Monto en centavos
+          example: 50000
+        currency:
+          type: string
+          enum: [USD, ARS]
+          description: Moneda del pago
+          example: "USD"
+        payer:
+          $ref: '#/components/schemas/Payer'
+
+    Payer:
+      type: object
+      required:
+        - name
+        - email
+      properties:
+        name:
+          type: string
+          minLength: 1
+          description: Nombre del pagador
+          example: "John Doe"
+        email:
+          type: string
+          format: email
+          description: Email del pagador
+          example: "john.doe@example.com"
+
+    CreatePaymentResponse:
+      type: object
+      properties:
+        payment_id:
+          type: string
+          format: uuid
+          description: ID único del pago
+          example: "123e4567-e89b-12d3-a456-426614174000"
+        status:
+          type: string
+          enum: [pending, paid, reversed]
+          description: Estado actual del pago
+          example: "pending"
+        checkout_url:
+          type: string
+          format: uri
+          description: URL de checkout para el pago
+          example: "https://sandbox.hibe.local/checkout/123e4567-e89b-12d3-a456-426614174000"
+
+    ListPaymentsResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/PaymentItem'
+        next_cursor:
+          type: string
+          format: date-time
+          nullable: true
+          description: Cursor para la siguiente página
+
+    PaymentItem:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: ID único del pago
+        description:
+          type: string
+          description: Descripción del pago
+        due_date:
+          type: string
+          format: date
+          description: Fecha de vencimiento
+        amount_cents:
+          type: integer
+          description: Monto en centavos
+        currency:
+          type: string
+          enum: [USD, ARS]
+          description: Moneda del pago
+        payer_name:
+          type: string
+          description: Nombre del pagador
+        payer_email:
+          type: string
+          format: email
+          description: Email del pagador
+        status:
+          type: string
+          enum: [pending, paid, reversed]
+          description: Estado del pago
+        checkout_url:
+          type: string
+          format: uri
+          description: URL de checkout
+        created_at:
+          type: string
+          format: date-time
+          description: Fecha de creación
+
+    BatchPaymentRequest:
+      type: object
+      required:
+        - payments
+      properties:
+        payments:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items:
+            $ref: '#/components/schemas/CreatePaymentRequest'
+
+    BatchPaymentResponse:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/BatchPaymentResult'
+        failed:
+          type: integer
+          description: Número de pagos que fallaron
+          example: 0
+        succeeded:
+          type: integer
+          description: Número de pagos exitosos
+          example: 2
+
+    BatchPaymentResult:
+      type: object
+      properties:
+        index:
+          type: integer
+          description: Índice del pago en el lote
+          example: 0
+        payment_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: ID del pago creado
+        status:
+          type: string
+          enum: [pending, paid, reversed]
+          nullable: true
+          description: Estado del pago
+        error:
+          $ref: '#/components/schemas/BatchPaymentError'
+          nullable: true
+          description: Error si el pago falló
+
+    BatchPaymentError:
+      type: object
+      properties:
+        code:
+          type: string
+          description: Código de error
+          example: "validation_error"
+        message:
+          type: string
+          description: Mensaje de error
+          example: "Due date must be in the future"
+
+    WebhookRequest:
+      type: object
+      required:
+        - payment_id
+        - new_status
+      properties:
+        payment_id:
+          type: string
+          format: uuid
+          description: ID del pago a actualizar
+          example: "123e4567-e89b-12d3-a456-426614174000"
+        new_status:
+          type: string
+          enum: [paid, reversed]
+          description: Nuevo estado del pago
+          example: "paid"
+        reason:
+          type: string
+          description: Razón del cambio de estado
+          nullable: true
+          example: "Payment completed successfully"
+
+    WebhookResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: "Payment status updated successfully"
+        payment_id:
+          type: string
+          format: uuid
+        new_status:
+          type: string
+          enum: [paid, reversed]
+        reason:
+          type: string
+          nullable: true
+
+    ValidationError:
+      type: object
+      properties:
+        error:
+          type: string
+          example: "Validation failed"
+        details:
+          type: array
+          items:
+            type: string
+          example: ["Due date must be in the future", "Amount must be positive"]
+
+    IdempotencyConflictError:
+      type: object
+      properties:
+        error:
+          type: string
+          example: "Idempotency key conflict"
+        details:
+          type: array
+          items:
+            type: string
+          example: ["Request payload differs from stored request"]
+
+    UnauthorizedError:
+      type: object
+      properties:
+        error:
+          type: string
+          example: "Invalid webhook token"
+        details:
+          type: array
+          items:
+            type: string
+          example: ["Authentication required"]
+
+    NotFoundError:
+      type: object
+      properties:
+        error:
+          type: string
+          example: "Payment not found"
+        details:
+          type: array
+          items:
+            type: string
+          example: ["Payment with ID 123e4567-e89b-12d3-a456-426614174000 not found"]
+
+    UnprocessableEntityError:
+      type: object
+      properties:
+        error:
+          type: string
+          example: "Invalid status transition"
+        details:
+          type: array
+          items:
+            type: string
+          example: ["Cannot transition from 'paid' to 'paid'"]
+
+    RateLimitError:
+      type: object
+      properties:
+        error:
+          type: string
+          example: "Rate limit exceeded"
+        details:
+          type: array
+          items:
+            type: string
+          example: ["Too many requests, please try again later"]
+
+    InternalServerError:
+      type: object
+      properties:
+        error:
+          type: string
+          example: "Internal server error"
+        details:
+          type: array
+          items:
+            type: string
+          example: ["An unexpected error occurred"]
+
+tags:
+  - name: Health
+    description: Endpoints de monitoreo del servicio
+  - name: Monitoring
+    description: Métricas y observabilidad
+  - name: Payments
+    description: Gestión de pagos individuales
+  - name: Batch Payments
+    description: Procesamiento de pagos por lotes
+  - name: Webhooks
+    description: Simulación de actualizaciones de estado

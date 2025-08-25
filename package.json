@@ -1,0 +1,71 @@
+{
+  "name": "hibe-ai",
+  "version": "1.0.0",
+  "description": "Coding test for HIBE AI",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "test:ci": "jest --ci --coverage --watchAll=false",
+    "migrate": "ts-node src/database/migrate.ts",
+    "seed": "ts-node src/database/seed.ts",
+    "lint": "eslint src/**/*.ts",
+    "lint:fix": "eslint src/**/*.ts --fix",
+    "format": "prettier --write src/**/*.ts",
+    "clean": "rimraf dist logs database/*.db",
+    "health": "curl http://localhost:3000/health",
+    "metrics": "curl http://localhost:3000/metrics"
+  },
+  "author": "Jonathan Pilatti",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.18.2",
+    "sequelize": "^6.35.2",
+    "sqlite3": "^5.1.6",
+    "cors": "^2.8.5",
+    "helmet": "^7.1.0",
+    "express-rate-limit": "^7.1.5",
+    "uuid": "^9.0.1",
+    "dotenv": "^16.3.1",
+    "joi": "^17.11.0",
+    "winston": "^3.11.0",
+    "prom-client": "^15.1.0"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/cors": "^2.8.17",
+    "@types/uuid": "^9.0.7",
+    "@types/node": "^20.10.5",
+    "typescript": "^5.3.3",
+    "ts-node": "^10.9.2",
+    "ts-node-dev": "^2.0.0",
+    "jest": "^29.7.0",
+    "@types/jest": "^29.5.8",
+    "ts-jest": "^29.1.1",
+    "eslint": "^8.56.0",
+    "@typescript-eslint/eslint-plugin": "^6.15.0",
+    "@typescript-eslint/parser": "^6.15.0",
+    "prettier": "^3.1.1",
+    "rimraf": "^5.0.5"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  },
+  "keywords": [
+    "payment",
+    "api",
+    "nodejs",
+    "express",
+    "typescript",
+    "sequelize",
+    "sqlite",
+    "idempotency",
+    "webhooks",
+    "batch-processing"
+  ]
+}
