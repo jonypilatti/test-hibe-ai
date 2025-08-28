@@ -6,7 +6,7 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - NODE_ENV=development
+      - NODE_ENV=production
       - PORT=3000
       - DB_PATH=./database/hibe_ai.db
       - DB_LOGGING=true
@@ -16,7 +16,7 @@ services:
       - BATCH_RETRY_ATTEMPTS=3
       - BATCH_RETRY_DELAY_MS=1000
       - CHECKOUT_BASE_URL=https://sandbox.hibe.local/checkout
-      - LOG_LEVEL=debug
+      - LOG_LEVEL=info
       - ENABLE_METRICS=true
       - ENABLE_BATCH_PROCESSING=true
       - ENABLE_WEBHOOKS=true
@@ -24,7 +24,6 @@ services:
     volumes:
       - ./database:/app/database
       - ./logs:/app/logs
-    command: npm run dev
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"]
@@ -33,6 +32,19 @@ services:
       retries: 3
       start_period: 40s
     depends_on: []
+
+  # SQLite Web Interface - Mucho mejor que Adminer para SQLite
+  sqlite-web:
+    image: coleifer/sqlite-web:latest
+    ports:
+      - "8081:8080"
+    volumes:
+      - ./database:/data
+    environment:
+      - SQLITE_DATABASE=/data/hibe_ai.db
+    restart: unless-stopped
+    depends_on:
+      - hibe-ai
 
   # Optional: Add Prometheus for metrics collection
   prometheus:

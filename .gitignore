@@ -230,6 +230,7 @@ pids/
 coverage/
 *.lcov
 
+scripts/*
 
 # nyc test coverage
 .nyc_output
