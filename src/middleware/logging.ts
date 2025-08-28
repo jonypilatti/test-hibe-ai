@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { httpLogger, logAudit } from '../config/logger';
+import { httpLogger } from '../config/logger';
 import { recordHttpRequest } from '../config/metrics';
 import { appConfig } from '../config/config';
 
@@ -8,7 +8,7 @@ export interface LoggedRequest extends Request {
   requestId?: string;
   startTime?: number;
   userAgent?: string;
-  ip?: string;
+  ip: string;
   correlationId?: string;
 }
 
@@ -48,18 +48,6 @@ const sanitizeHeaders = (headers: Record<string, any>): Record<string, any> => {
   return sanitized;
 };
 
-// Función para determinar si un request debe ser auditado
-const shouldAuditRequest = (req: Request): boolean => {
-  const auditEndpoints = [
-    '/api/v1/payments',
-    '/api/v1/payments/batch',
-    '/api/v1/webhooks/simulate',
-  ];
-  
-  return auditEndpoints.some(endpoint => 
-    req.path.startsWith(endpoint) && req.method !== 'GET'
-  );
-};
 
 // Middleware principal de logging
 export const httpLoggingMiddleware = (req: Request, res: Response, next: NextFunction): void => {
@@ -88,7 +76,7 @@ export const httpLoggingMiddleware = (req: Request, res: Response, next: NextFun
 
   // Interceptar la respuesta para logging
   const originalSend = res.send;
-  res.send = function(data: any) {
+  (res as any).send = function(data: any) {
     const duration = Date.now() - requestInfo.startTime;
     const statusCode = res.statusCode;
     
@@ -116,28 +104,7 @@ export const httpLoggingMiddleware = (req: Request, res: Response, next: NextFun
       );
     }
 
-    // Log de auditoría para endpoints críticos
-    if (shouldAuditRequest(req)) {
-      const auditDetails = {
-        method: req.method,
-        path: req.path,
-        statusCode,
-        duration,
-        ip: requestInfo.ip,
-        userAgent: requestInfo.userAgent,
-        requestId: requestInfo.requestId,
-        correlationId: requestInfo.correlationId,
-        body: req.method !== 'GET' ? req.body : undefined,
-        query: Object.keys(req.query).length > 0 ? req.query : undefined,
-      };
 
-      logAudit(
-        `${req.method} ${req.path}`,
-        undefined, // userId - implementar cuando se agregue autenticación
-        requestInfo.requestId,
-        auditDetails
-      );
-    }
 
     // Log de errores
     if (statusCode >= 400) {
@@ -162,7 +129,7 @@ export const httpLoggingMiddleware = (req: Request, res: Response, next: NextFun
 
   // Interceptar errores
   const originalJson = res.json;
-  res.json = function(data: any) {
+  (res as any).json = function(data: any) {
     const duration = Date.now() - (requestInfo.startTime || 0);
     
     // Log de respuesta JSON
@@ -188,7 +155,7 @@ export const httpLoggingMiddleware = (req: Request, res: Response, next: NextFun
 export const errorLoggingMiddleware = (
   error: any,
   req: Request,
-  res: Response,
+  _res: Response,
   next: NextFunction
 ): void => {
   const loggedReq = req as LoggedRequest;

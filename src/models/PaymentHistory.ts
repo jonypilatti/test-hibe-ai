@@ -2,7 +2,6 @@ import {
   Model,
   DataTypes,
   Optional,
-  BelongsTo,
   Association,
 } from 'sequelize';
 import { sequelize } from '../config/database';
@@ -31,7 +30,7 @@ export class PaymentHistory extends Model<PaymentHistoryAttributes, PaymentHisto
   // Associations
   public readonly payment?: Payment;
 
-  public static associations: {
+  public static override associations: {
     payment: Association<PaymentHistory, Payment>;
   };
 }

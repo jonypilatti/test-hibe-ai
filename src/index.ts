@@ -13,8 +13,7 @@ import { getMetrics } from './config/metrics';
 import { 
   httpLoggingMiddleware, 
   errorLoggingMiddleware, 
-  slowRequestLoggingMiddleware,
-  LoggedRequest 
+  slowRequestLoggingMiddleware
 } from './middleware/logging';
 
 // Modelos y servicios
@@ -73,12 +72,12 @@ app.use(cors({
 // Middleware de parsing
 app.use(express.json({ 
   limit: '10mb',
-  verify: (req, res, buf) => {
+  verify: (_req, res, buf) => {
     // Verificar que el JSON sea válido
     try {
       JSON.parse(buf.toString());
     } catch (e) {
-      res.status(400).json({
+      (res as any).status(400).json({
         error: 'Invalid JSON',
         details: ['The request body contains invalid JSON'],
       });
@@ -100,11 +99,11 @@ const createRateLimiter = (windowMs: number, max: number, message: string) => {
     },
     standardHeaders: true,
     legacyHeaders: false,
-    handler: (req, res) => {
+    handler: (_req, res) => {
       logger.warn('Rate limit exceeded', {
-        ip: req.ip,
-        endpoint: req.path,
-        userAgent: req.get('User-Agent'),
+        ip: _req.ip,
+        endpoint: _req.path,
+        userAgent: _req.get('User-Agent'),
       });
       res.status(429).json({
         error: 'Rate limit exceeded',
@@ -136,7 +135,7 @@ app.use('/api/v1/webhooks/', createRateLimiter(
 ));
 
 // Health check mejorado
-app.get('/health', async (req, res) => {
+app.get('/health', async (_req, res) => {
   try {
     const dbHealth = await checkDatabaseHealth();
     const memUsage = process.memoryUsage();
@@ -192,7 +191,7 @@ app.get('/health', async (req, res) => {
 
 // Endpoint de métricas para Prometheus
 if (appConfig.monitoring.enableMetrics) {
-  app.get('/metrics', async (req, res) => {
+  app.get('/metrics', async (_req, res) => {
     try {
       const metrics = await getMetrics();
       res.set('Content-Type', 'text/plain');
@@ -246,7 +245,7 @@ app.use('*', (req, res) => {
 app.use(errorLoggingMiddleware);
 
 // Global error handler mejorado
-app.use((error: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+app.use((error: any, req: express.Request, res: express.Response, _next: express.NextFunction) => {
   logger.error('Unhandled error in application', {
     error: {
       name: error.name,
@@ -397,7 +396,7 @@ process.on('uncaughtException', (error) => {
   process.exit(1);
 });
 
-process.on('unhandledRejection', (reason, promise) => {
+process.on('unhandledRejection', (reason, _promise) => {
   logger.error('❌ Promesa rechazada no manejada', {
     reason: reason instanceof Error ? reason.message : reason,
   });

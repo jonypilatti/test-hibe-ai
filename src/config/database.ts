@@ -15,6 +15,10 @@ export const sequelize = new Sequelize({
   dialect: 'sqlite',
   storage: appConfig.database.path,
   logging: appConfig.database.logging ? (msg) => logger.debug(msg) : false,
+  dialectOptions: {
+    // Usar SQLite3 nativo en Docker
+    mode: process.env.NODE_ENV === 'production' ? 'WAL' : 'DELETE',
+  },
   
   // Configuración de pool para SQLite (aunque SQLite no usa pool tradicional)
   pool: {

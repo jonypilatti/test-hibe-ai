@@ -6,7 +6,7 @@ export interface AuthenticatedRequest extends Request {
 
 export const authenticateWebhook = (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
   const webhookToken = req.headers['x-webhook-token'] as string;
-  const expectedToken = process.env.WEBHOOK_TOKEN;
+  const expectedToken = process.env['WEBHOOK_TOKEN'];
 
   if (!webhookToken) {
     res.status(401).json({

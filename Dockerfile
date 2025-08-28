@@ -1,7 +1,7 @@
 FROM node:18-alpine
 
-# Install dependencies for node-gyp (if needed)
-RUN apk add --no-cache python3 make g++
+# Install dependencies for node-gyp and sqlite3
+RUN apk add --no-cache python3 make g++ sqlite
 
 # Create app directory
 WORKDIR /app
