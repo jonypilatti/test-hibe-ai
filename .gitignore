@@ -185,10 +185,6 @@ storybook-static
 tmp/
 temp/
 
-# Database files
-*.db
-*.sqlite
-*.sqlite3
 
 # IDE and editor files
 .vscode/
@@ -304,7 +300,6 @@ temp/
 *.db
 *.sqlite
 *.sqlite3
-database/
 
 # IDE and editor files
 .vscode/
