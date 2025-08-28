@@ -189,7 +189,6 @@ temp/
 *.db
 *.sqlite
 *.sqlite3
-database/
 
 # IDE and editor files
 .vscode/
